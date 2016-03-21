@@ -100,6 +100,8 @@ $(function () {
 
 默认的jquery.fileupload.js插件可能是作者在制作时没有考虑到这个问题，所以如果上传的是文件名含有中文的文件，是上传不了的，修改如下：
 
+【参考：http://blog.csdn.net/zhouyingge1104/article/details/38322403】
+
 编辑jquery.fileupload.js，找到第477行
 ```javascript
   if (options.blob) {
@@ -123,4 +125,39 @@ $(function () {
 
 将其修改为
 ```javascript
+encodeURI(file.uploadName || file.name)
 ```
+
+此时再次上传含有中文的文件，你会发现，文件可以上传了，只是文件名变成了一串编码过的字符。如果是用java的，可以参考上面给的参考链接修改，php的我改了大半天也没改成，于是决定不使用这个插件自带的php，自己写一个接收文件的php，再将其文件保存时把文件名urldecode一下就可以了。
+
+```php
+    $up_files = $_FILES['files'];
+    $result = array();
+    for($i=0; $i < count($up_files['name']); $i++){
+        if (empty($up_files['error'][$i]) || (!isset($up_files['error'][$i]) && isset($up_files['tmp_name'][$i]) && $up_files['tmp_name'][$i] != 'none'))
+        {
+            // 检查文件格式
+            if (!check_file_type($up_files['tmp_name'][$i], $up_files['name'][$i], $allow_file_types))
+            {
+                continue;
+            }
+
+            // 复制文件
+            $res = upload_article_file($up_files, $i);
+            if ($res != false)
+            {
+                $result[] = array(
+                    "name" => urldecode($up_files['name'][$i]),
+                    "url"  => $res
+                );
+            }
+        }
+    }
+    echo json_encode($result);die;
+```
+
+## 关于php上传文件的大小限制问题
+
+如果你在修改了php.ini 文件中 upload_max_filesize（上载文件的最大许可大小） 这个参数之后仍然发现只能上传2M以内的文件，那么就需要再次修改：post_max_size（表单提交最大数据），将其设置成一个较大的值
+
+如果还是不行，修改：max_execution_time（脚本运行时间）和memory_limit（脚本运行最大消耗的内存）
